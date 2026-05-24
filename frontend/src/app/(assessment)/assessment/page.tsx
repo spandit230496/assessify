@@ -20,6 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { formatTime } from '@/lib/utils';
+import dynamic from 'next/dynamic';
+
+const CodeEditor = dynamic(() => import('@/components/coding/code-editor'), { ssr: false });
 
 interface QuestionData {
   id: string;
@@ -28,6 +31,13 @@ interface QuestionData {
   body: string;
   marks: number;
   options: { id: string; text: string; order: number }[];
+  codingConfig?: {
+    languages: string[];
+    boilerplateCode?: Record<string, string>;
+    timeLimitMs: number;
+    memoryLimitMb: number;
+  };
+  testCases?: { id: string; input: string; expected: string; isHidden: boolean; order: number }[];
 }
 
 type QuestionStatus = 'not_visited' | 'visited' | 'answered' | 'marked' | 'answered_marked';
@@ -87,6 +97,28 @@ const SAMPLE_QUESTIONS: QuestionData[] = [
     body: 'React uses a _______ to efficiently update the real DOM by comparing changes.',
     options: [],
   },
+  {
+    id: '7', type: 'CODING', title: 'Two Sum', marks: 15,
+    body: 'Given an array of integers `nums` and an integer `target`, return the indices of the two numbers that add up to `target`.\n\nYou may assume each input has exactly one solution, and you may not use the same element twice.\n\n**Example:**\n```\nInput: nums = [2, 7, 11, 15], target = 9\nOutput: [0, 1]\nExplanation: nums[0] + nums[1] = 2 + 7 = 9\n```',
+    options: [],
+    codingConfig: {
+      languages: ['python', 'javascript', 'java', 'cpp', 'go'],
+      boilerplateCode: {
+        python: 'def two_sum(nums, target):\n    # Write your solution here\n    pass\n\n# Read input\nnums = list(map(int, input().split()))\ntarget = int(input())\nresult = two_sum(nums, target)\nprint(result)',
+        javascript: 'function twoSum(nums, target) {\n  // Write your solution here\n}\n\n// Read input\nconst readline = require("readline");\nconst rl = readline.createInterface({ input: process.stdin });\nconst lines = [];\nrl.on("line", (l) => lines.push(l));\nrl.on("close", () => {\n  const nums = lines[0].split(" ").map(Number);\n  const target = Number(lines[1]);\n  console.log(twoSum(nums, target));\n});',
+        java: 'import java.util.*;\n\npublic class Solution {\n    public static int[] twoSum(int[] nums, int target) {\n        // Write your solution here\n        return new int[]{};\n    }\n\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        String[] parts = sc.nextLine().split(" ");\n        int[] nums = Arrays.stream(parts).mapToInt(Integer::parseInt).toArray();\n        int target = sc.nextInt();\n        System.out.println(Arrays.toString(twoSum(nums, target)));\n    }\n}',
+        cpp: '#include <iostream>\n#include <vector>\n#include <sstream>\nusing namespace std;\n\nvector<int> twoSum(vector<int>& nums, int target) {\n    // Write your solution here\n    return {};\n}\n\nint main() {\n    string line;\n    getline(cin, line);\n    istringstream iss(line);\n    vector<int> nums;\n    int n;\n    while (iss >> n) nums.push_back(n);\n    int target;\n    cin >> target;\n    auto res = twoSum(nums, target);\n    cout << "[" << res[0] << ", " << res[1] << "]" << endl;\n    return 0;\n}',
+        go: 'package main\n\nimport (\n\t"fmt"\n)\n\nfunc twoSum(nums []int, target int) []int {\n\t// Write your solution here\n\treturn nil\n}\n\nfunc main() {\n\tnums := []int{2, 7, 11, 15}\n\ttarget := 9\n\tfmt.Println(twoSum(nums, target))\n}',
+      },
+      timeLimitMs: 5000,
+      memoryLimitMb: 256,
+    },
+    testCases: [
+      { id: 'tc1', input: '2 7 11 15\n9', expected: '[0, 1]', isHidden: false, order: 0 },
+      { id: 'tc2', input: '3 2 4\n6', expected: '[1, 2]', isHidden: false, order: 1 },
+      { id: 'tc3', input: '3 3\n6', expected: '[0, 1]', isHidden: true, order: 2 },
+    ],
+  },
 ];
 
 export default function AssessmentPage() {
@@ -94,6 +126,7 @@ export default function AssessmentPage() {
   const [remainingSeconds, setRemainingSeconds] = useState(3600);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
   const [textAnswers, setTextAnswers] = useState<Record<string, string>>({});
+  const [codeAnswers, setCodeAnswers] = useState<Record<string, { language: string; code: string }>>({});
   const [statuses, setStatuses] = useState<Record<string, QuestionStatus>>(
     Object.fromEntries(SAMPLE_QUESTIONS.map((q) => [q.id, 'not_visited']))
   );
@@ -269,6 +302,29 @@ export default function AssessmentPage() {
                           </button>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Coding Editor */}
+                  {question.type === 'CODING' && question.codingConfig && (
+                    <div className="mt-4 h-[500px]">
+                      <CodeEditor
+                        languages={question.codingConfig.languages}
+                        boilerplateCode={question.codingConfig.boilerplateCode}
+                        testCases={question.testCases}
+                        initialLanguage={codeAnswers[question.id]?.language}
+                        initialCode={codeAnswers[question.id]?.code}
+                        onCodeChange={(lang, code) => {
+                          setCodeAnswers((prev) => ({ ...prev, [question.id]: { language: lang, code } }));
+                          if (code.trim()) {
+                            setStatuses((prev) => ({ ...prev, [question.id]: 'answered' }));
+                          }
+                        }}
+                        onSubmit={(lang, code) => {
+                          setCodeAnswers((prev) => ({ ...prev, [question.id]: { language: lang, code } }));
+                          setStatuses((prev) => ({ ...prev, [question.id]: 'answered' }));
+                        }}
+                      />
                     </div>
                   )}
 
