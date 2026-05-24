@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Post,
-  Body,
-  UseGuards,
-  Req,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
@@ -35,11 +27,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'User login' })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.authService.login(
-      dto,
-      req.headers['user-agent'],
-      req.ip,
-    );
+    return this.authService.login(dto, req.headers['user-agent'], req.ip);
   }
 
   @Post('refresh')

@@ -6,24 +6,19 @@ export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
 
   async getDashboardStats() {
-    const [
-      totalUsers,
-      totalAssessments,
-      totalAttempts,
-      completedAttempts,
-      avgScore,
-    ] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.assessment.count(),
-      this.prisma.assessmentAttempt.count(),
-      this.prisma.assessmentAttempt.count({
-        where: { status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } },
-      }),
-      this.prisma.assessmentAttempt.aggregate({
-        _avg: { percentage: true },
-        where: { status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } },
-      }),
-    ]);
+    const [totalUsers, totalAssessments, totalAttempts, completedAttempts, avgScore] =
+      await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.assessment.count(),
+        this.prisma.assessmentAttempt.count(),
+        this.prisma.assessmentAttempt.count({
+          where: { status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } },
+        }),
+        this.prisma.assessmentAttempt.aggregate({
+          _avg: { percentage: true },
+          where: { status: { in: ['SUBMITTED', 'AUTO_SUBMITTED'] } },
+        }),
+      ]);
 
     return {
       totalUsers,
@@ -31,9 +26,7 @@ export class AnalyticsService {
       totalAttempts,
       completedAttempts,
       completionRate:
-        totalAttempts > 0
-          ? ((completedAttempts / totalAttempts) * 100).toFixed(1)
-          : 0,
+        totalAttempts > 0 ? ((completedAttempts / totalAttempts) * 100).toFixed(1) : 0,
       averageScore: avgScore._avg.percentage?.toFixed(1) || 0,
     };
   }
@@ -53,9 +46,7 @@ export class AnalyticsService {
     });
 
     const scores = attempts.map((a) => a.percentage);
-    const avgScore = scores.length
-      ? scores.reduce((a, b) => a + b, 0) / scores.length
-      : 0;
+    const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     const maxScore = scores.length ? Math.max(...scores) : 0;
     const minScore = scores.length ? Math.min(...scores) : 0;
 

@@ -151,3 +151,149 @@ export interface SystemCheck {
   status: 'pending' | 'checking' | 'passed' | 'failed';
   details?: string;
 }
+
+// ─── API Testing Types ──────────────────────────────────────────
+
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+export type ApiAuthType = 'NONE' | 'BEARER_TOKEN' | 'BASIC_AUTH' | 'API_KEY' | 'OAUTH2';
+export type ApiBodyType = 'NONE' | 'JSON' | 'XML' | 'FORM_DATA' | 'MULTIPART' | 'RAW' | 'BINARY' | 'GRAPHQL';
+export type ApiRequestStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'ERROR' | 'TIMEOUT' | 'CANCELLED';
+export type ApiWorkspaceRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
+export type ApiProtocol = 'REST' | 'GRAPHQL' | 'WEBSOCKET' | 'GRPC';
+
+export interface ApiWorkspace {
+  id: string;
+  name: string;
+  description?: string;
+  ownerId: string;
+  isPersonal: boolean;
+  settings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  owner?: { id: string; firstName: string; lastName: string; email: string };
+  _count?: { collections: number; teamMembers: number; environments: number };
+  collections?: ApiCollection[];
+  environments?: ApiEnvironment[];
+  teamMembers?: ApiTeamMember[];
+  variables?: ApiVariable[];
+}
+
+export interface ApiCollection {
+  id: string;
+  workspaceId: string;
+  parentId?: string;
+  name: string;
+  description?: string;
+  order: number;
+  children?: ApiCollection[];
+  requests?: ApiRequestItem[];
+}
+
+export interface ApiRequestItem {
+  id: string;
+  collectionId: string;
+  name: string;
+  description?: string;
+  method: HttpMethod;
+  url: string;
+  protocol: ApiProtocol;
+  headers?: Record<string, string>;
+  queryParams?: Record<string, string>;
+  pathParams?: Record<string, string>;
+  cookies?: Record<string, string>;
+  authType: ApiAuthType;
+  authConfig?: Record<string, unknown>;
+  bodyType: ApiBodyType;
+  body?: string;
+  preRequestScript?: string;
+  testScript?: string;
+  timeoutMs: number;
+  followRedirects: boolean;
+  retryCount: number;
+  retryDelayMs: number;
+  order: number;
+  responses?: ApiResponseItem[];
+  testCases?: ApiTestCaseItem[];
+  assertions?: ApiAssertionItem[];
+}
+
+export interface ApiEnvironment {
+  id: string;
+  workspaceId: string;
+  name: string;
+  variables: ApiEnvVariable[];
+  isActive: boolean;
+}
+
+export interface ApiEnvVariable {
+  key: string;
+  value: string;
+  enabled?: boolean;
+  isSecret?: boolean;
+}
+
+export interface ApiHistoryItem {
+  id: string;
+  requestId?: string;
+  userId: string;
+  method: HttpMethod;
+  url: string;
+  requestHeaders?: Record<string, string>;
+  requestBody?: string;
+  statusCode?: number;
+  responseHeaders?: Record<string, string>;
+  responseBody?: string;
+  responseTimeMs?: number;
+  responseSizeBytes?: number;
+  error?: string;
+  status: ApiRequestStatus;
+  createdAt: string;
+}
+
+export interface ApiResponseItem {
+  id: string;
+  requestId: string;
+  name: string;
+  statusCode: number;
+  headers?: Record<string, string>;
+  body?: string;
+  responseTimeMs?: number;
+}
+
+export interface ApiTestCaseItem {
+  id: string;
+  requestId: string;
+  name: string;
+  script: string;
+  isActive: boolean;
+  lastResult?: Record<string, unknown>;
+}
+
+export interface ApiAssertionItem {
+  id: string;
+  requestId: string;
+  name: string;
+  property: string;
+  comparison: string;
+  expectedValue: string;
+  isActive: boolean;
+  lastResult?: boolean;
+}
+
+export interface ApiVariable {
+  id: string;
+  workspaceId: string;
+  key: string;
+  value: string;
+  isSecret: boolean;
+  scope: string;
+}
+
+export interface ApiTeamMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: ApiWorkspaceRole;
+  joinedAt: string;
+  user?: { id: string; firstName: string; lastName: string; email: string; avatarUrl?: string };
+}

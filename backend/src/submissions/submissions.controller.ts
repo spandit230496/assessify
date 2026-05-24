@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Param,
-  Body,
-  UseGuards,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
@@ -44,10 +35,7 @@ export class SubmissionsController {
   @Post(':attemptId/answer')
   @Roles(Role.CANDIDATE)
   @ApiOperation({ summary: 'Submit answer for a question' })
-  async submitAnswer(
-    @Param('attemptId') attemptId: string,
-    @Body() dto: SubmitAnswerDto,
-  ) {
+  async submitAnswer(@Param('attemptId') attemptId: string, @Body() dto: SubmitAnswerDto) {
     return this.submissionsService.submitAnswer(attemptId, dto);
   }
 

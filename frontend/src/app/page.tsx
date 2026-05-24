@@ -14,6 +14,7 @@ import {
   Zap,
   Lock,
   Globe,
+  FlaskConical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,6 +50,11 @@ const features = [
     title: 'Smart Timer',
     description: 'Global and per-question timers with auto-submit, WebSocket sync, and resume support.',
   },
+  {
+    icon: FlaskConical,
+    title: 'API Testing',
+    description: 'Integrated REST API testing workspace with collections, environments, and team collaboration.',
+  },
 ];
 
 const stats = [
@@ -72,6 +78,7 @@ export default function LandingPage() {
           </div>
           <div className="hidden md:flex items-center gap-8">
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</Link>
+            <Link href="/api-testing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">API Testing</Link>
             <Link href="#stats" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Stats</Link>
             <Link href="/auth/login">
               <Button variant="ghost" size="sm">Sign In</Button>

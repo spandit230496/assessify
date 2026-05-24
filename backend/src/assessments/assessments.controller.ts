@@ -31,10 +31,7 @@ export class AssessmentsController {
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.RECRUITER)
   @ApiOperation({ summary: 'Create a new assessment' })
-  async create(
-    @Body() dto: CreateAssessmentDto,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async create(@Body() dto: CreateAssessmentDto, @CurrentUser() user: JwtPayload) {
     return this.assessmentsService.create(dto, user.sub);
   }
 
@@ -81,20 +78,14 @@ export class AssessmentsController {
   @Patch(':id/publish')
   @Roles(Role.SUPER_ADMIN, Role.RECRUITER)
   @ApiOperation({ summary: 'Publish assessment' })
-  async publish(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async publish(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.assessmentsService.publish(id, user.sub);
   }
 
   @Patch(':id/archive')
   @Roles(Role.SUPER_ADMIN, Role.RECRUITER)
   @ApiOperation({ summary: 'Archive assessment' })
-  async archive(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async archive(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.assessmentsService.archive(id, user.sub);
   }
 
@@ -108,10 +99,7 @@ export class AssessmentsController {
   @Delete(':id')
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete assessment' })
-  async delete(
-    @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async delete(@Param('id') id: string, @CurrentUser() user: JwtPayload) {
     return this.assessmentsService.delete(id, user.sub);
   }
 }

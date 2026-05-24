@@ -40,10 +40,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Get audit logs' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  async getAuditLogs(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
+  async getAuditLogs(@Query('page') page?: number, @Query('limit') limit?: number) {
     return this.analyticsService.getAuditLogs(page, limit);
   }
 }

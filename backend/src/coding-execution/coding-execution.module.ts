@@ -5,9 +5,7 @@ import { CodingExecutionController } from './coding-execution.controller';
 import { CodeExecutionProcessor } from './code-execution.processor';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: 'code-execution' }),
-  ],
+  imports: [BullModule.registerQueue({ name: 'code-execution' })],
   controllers: [CodingExecutionController],
   providers: [CodingExecutionService, CodeExecutionProcessor],
   exports: [CodingExecutionService],

@@ -26,6 +26,7 @@ A production-grade full-stack online assessment platform for company hiring, sim
 - **Proctoring System**: Webcam capture, face detection, tab-switch, copy/paste restriction, screenshot capture
 - **Admin Dashboard**: User management, analytics, reports, violation monitoring, leaderboards
 - **Security**: CSRF, XSS prevention, rate limiting, helmet, anti-cheat measures
+- **API Testing Module**: Integrated REST API testing workspace (Postman/Hoppscotch-like) with collections, environments, request execution, history, team collaboration, SSRF protection, WebSocket real-time updates, and BullMQ-based execution queue
 
 ## Quick Start
 
@@ -85,6 +86,26 @@ assessify/
 ├── .github/workflows/ # CI/CD pipelines
 └── docker-compose.yml
 ```
+
+## API Testing Module
+
+The platform includes an integrated API Testing workspace at `/api-testing`:
+
+**Features:**
+- REST API testing (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
+- Request builder with headers, query params, path params, auth (Bearer, Basic, API Key, OAuth2), body (JSON, XML, Form Data, Raw, GraphQL)
+- Response viewer with syntax highlighting, pretty JSON, raw/preview modes
+- API Collections with nested folders (drag & drop)
+- Environment variables and secrets management
+- Request history with status codes and response times
+- Team collaboration with workspace-level RBAC (Owner, Admin, Editor, Viewer)
+- Queue-based request execution via BullMQ
+- SSRF protection (blocks internal/private addresses)
+- Real-time execution updates via WebSocket
+- gRPC-ready architecture
+
+**Backend API endpoints:** `/api/api-testing/*`
+**Swagger docs:** `/api/docs` (tag: api-testing)
 
 ## Environment Variables
 

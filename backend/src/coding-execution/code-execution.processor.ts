@@ -97,10 +97,7 @@ export class CodeExecutionProcessor extends WorkerHost {
     const sandboxDir = join('/tmp', `exec-${uuidv4()}`);
     mkdirSync(sandboxDir, { recursive: true });
 
-    const filename =
-      data.language === 'java'
-        ? `Solution.${config.ext}`
-        : `solution.${config.ext}`;
+    const filename = data.language === 'java' ? `Solution.${config.ext}` : `solution.${config.ext}`;
     writeFileSync(join(sandboxDir, filename), data.sourceCode);
     if (data.input) {
       writeFileSync(join(sandboxDir, 'input.txt'), data.input);
@@ -161,9 +158,7 @@ export class CodeExecutionProcessor extends WorkerHost {
         if (!config) throw new Error(`Unsupported language: ${data.language}`);
 
         const filename =
-          data.language === 'java'
-            ? `Solution.${config.ext}`
-            : `solution.${config.ext}`;
+          data.language === 'java' ? `Solution.${config.ext}` : `solution.${config.ext}`;
         writeFileSync(join(sandboxDir, filename), data.sourceCode);
         writeFileSync(join(sandboxDir, 'input.txt'), tc.input);
 
