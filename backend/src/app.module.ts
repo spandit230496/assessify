@@ -16,6 +16,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { CommonModule } from './common/common.module';
+import { ApiTestingModule } from './api-testing/api-testing.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { CommonModule } from './common/common.module';
     NotificationsModule,
     HealthModule,
     WebsocketModule,
+    ApiTestingModule,
   ],
 })
 export class AppModule {}

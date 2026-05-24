@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { AttemptStatus, AnswerStatus } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { SubmitAnswerDto } from './dto/submit-answer.dto';
@@ -14,12 +9,7 @@ export class SubmissionsService {
 
   constructor(private prisma: PrismaService) {}
 
-  async startAttempt(
-    assessmentId: string,
-    userId: string,
-    ipAddress?: string,
-    userAgent?: string,
-  ) {
+  async startAttempt(assessmentId: string, userId: string, ipAddress?: string, userAgent?: string) {
     const existing = await this.prisma.assessmentAttempt.findUnique({
       where: { assessmentId_userId: { assessmentId, userId } },
     });
@@ -63,9 +53,7 @@ export class SubmissionsService {
       },
     });
 
-    const questionIds = assessment.sections.flatMap((s) =>
-      s.questions.map((q) => q.id),
-    );
+    const questionIds = assessment.sections.flatMap((s) => s.questions.map((q) => q.id));
 
     await this.prisma.answer.createMany({
       data: questionIds.map((qId) => ({
@@ -143,13 +131,8 @@ export class SubmissionsService {
       const question = answer.question;
       let score = 0;
 
-      if (
-        question.type === 'MCQ' ||
-        question.type === 'TRUE_FALSE'
-      ) {
-        const correctOptions = question.options
-          .filter((o) => o.isCorrect)
-          .map((o) => o.id);
+      if (question.type === 'MCQ' || question.type === 'TRUE_FALSE') {
+        const correctOptions = question.options.filter((o) => o.isCorrect).map((o) => o.id);
         const isCorrect =
           answer.selectedOptionIds.length === correctOptions.length &&
           answer.selectedOptionIds.every((id) => correctOptions.includes(id));
@@ -160,14 +143,11 @@ export class SubmissionsService {
           data: { score, isCorrect },
         });
       } else if (question.type === 'MSQ') {
-        const correctOptions = question.options
-          .filter((o) => o.isCorrect)
-          .map((o) => o.id);
+        const correctOptions = question.options.filter((o) => o.isCorrect).map((o) => o.id);
         const correctSelected = answer.selectedOptionIds.filter((id) =>
           correctOptions.includes(id),
         );
-        score =
-          (correctSelected.length / correctOptions.length) * question.marks;
+        score = (correctSelected.length / correctOptions.length) * question.marks;
         await this.prisma.answer.update({
           where: { id: answer.id },
           data: {
@@ -180,8 +160,7 @@ export class SubmissionsService {
       totalScore += score;
     }
 
-    const percentage =
-      attempt.maxScore > 0 ? (totalScore / attempt.maxScore) * 100 : 0;
+    const percentage = attempt.maxScore > 0 ? (totalScore / attempt.maxScore) * 100 : 0;
 
     const now = new Date();
     const timeSpent = attempt.startedAt

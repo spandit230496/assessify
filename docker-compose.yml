@@ -96,6 +96,29 @@ services:
     depends_on:
       - backend
 
+  # ─── API Execution Worker ────────────────────────────────
+  api-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: assessify-api-worker
+    restart: unless-stopped
+    command: ['node', 'dist/main']
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+      DATABASE_URL: postgresql://assessify:assessify_pass@postgres:5432/assessify?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_ACCESS_SECRET: change-this-access-secret-in-production
+      JWT_REFRESH_SECRET: change-this-refresh-secret-in-production
+      WORKER_MODE: 'true'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # ─── Nginx Reverse Proxy ────────────────────────────────
   nginx:
     image: nginx:alpine

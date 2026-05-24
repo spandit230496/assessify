@@ -17,9 +17,7 @@ import { Server, Socket } from 'socket.io';
   },
   namespace: '/assessment',
 })
-export class AssessmentGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class AssessmentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -53,16 +51,12 @@ export class AssessmentGateway
       attemptId: data.attemptId,
     });
 
-    this.server
-      .to(`assessment:${data.assessmentId}`)
-      .emit('candidate-joined', {
-        userId: data.userId,
-        timestamp: new Date(),
-      });
+    this.server.to(`assessment:${data.assessmentId}`).emit('candidate-joined', {
+      userId: data.userId,
+      timestamp: new Date(),
+    });
 
-    this.logger.log(
-      `User ${data.userId} joined assessment ${data.assessmentId}`,
-    );
+    this.logger.log(`User ${data.userId} joined assessment ${data.assessmentId}`);
   }
 
   @SubscribeMessage('timer-sync')
@@ -101,12 +95,10 @@ export class AssessmentGateway
       details: string;
     },
   ) {
-    this.server
-      .to(`assessment:${data.assessmentId}`)
-      .emit('violation-alert', {
-        ...data,
-        timestamp: new Date(),
-      });
+    this.server.to(`assessment:${data.assessmentId}`).emit('violation-alert', {
+      ...data,
+      timestamp: new Date(),
+    });
   }
 
   @SubscribeMessage('proctor-message')
@@ -118,18 +110,14 @@ export class AssessmentGateway
       message: string;
     },
   ) {
-    this.server
-      .to(`attempt:${data.attemptId}`)
-      .emit('proctor-notification', {
-        message: data.message,
-        timestamp: new Date(),
-      });
+    this.server.to(`attempt:${data.attemptId}`).emit('proctor-notification', {
+      message: data.message,
+      timestamp: new Date(),
+    });
   }
 
   emitAutoSubmit(attemptId: string) {
-    this.server
-      .to(`attempt:${attemptId}`)
-      .emit('force-submit', { reason: 'Time expired' });
+    this.server.to(`attempt:${attemptId}`).emit('force-submit', { reason: 'Time expired' });
   }
 
   getActiveUsers() {

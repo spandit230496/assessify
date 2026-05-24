@@ -19,9 +19,7 @@ export class ProctoringService {
       data: { attemptId, userId, type, details, screenshot },
     });
 
-    this.logger.warn(
-      `Violation recorded: ${type} for attempt ${attemptId}`,
-    );
+    this.logger.warn(`Violation recorded: ${type} for attempt ${attemptId}`);
 
     return violation;
   }

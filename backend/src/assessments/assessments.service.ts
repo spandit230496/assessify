@@ -34,12 +34,7 @@ export class AssessmentsService {
     return assessment;
   }
 
-  async findAll(
-    page = 1,
-    limit = 20,
-    status?: AssessmentStatus,
-    search?: string,
-  ) {
+  async findAll(page = 1, limit = 20, status?: AssessmentStatus, search?: string) {
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (search) {

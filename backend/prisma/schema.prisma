@@ -122,6 +122,10 @@ model User {
   proctoringLogs    ProctoringLog[]
   auditLogs         AuditLog[]
   notifications     Notification[]
+  apiWorkspaces     APIWorkspace[]
+  apiTeamMembers    APITeamMember[]
+  apiHistories      APIHistory[]
+  apiLogs           APILog[]
 
   @@map("users")
 }
@@ -424,4 +428,287 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// ─── API TESTING ENUMS ──────────────────────────────────────────
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  HEAD
+  OPTIONS
+}
+
+enum ApiAuthType {
+  NONE
+  BEARER_TOKEN
+  BASIC_AUTH
+  API_KEY
+  OAUTH2
+}
+
+enum ApiBodyType {
+  NONE
+  JSON
+  XML
+  FORM_DATA
+  MULTIPART
+  RAW
+  BINARY
+  GRAPHQL
+}
+
+enum ApiRequestStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  ERROR
+  TIMEOUT
+  CANCELLED
+}
+
+enum ApiWorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum ApiProtocol {
+  REST
+  GRAPHQL
+  WEBSOCKET
+  GRPC
+}
+
+// ─── API TESTING MODELS ─────────────────────────────────────────
+
+model APIWorkspace {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  ownerId       String
+  isPersonal    Boolean  @default(false)
+  settings      Json?
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner         User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  collections   APICollection[]
+  environments  APIEnvironment[]
+  teamMembers   APITeamMember[]
+  mockServers   APIMockServer[]
+  variables     APIVariable[]
+
+  @@map("api_workspaces")
+}
+
+model APICollection {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  parentId      String?
+  name          String
+  description   String?
+  order         Int      @default(0)
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace     APIWorkspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent        APICollection?   @relation("CollectionTree", fields: [parentId], references: [id])
+  children      APICollection[]  @relation("CollectionTree")
+  requests      APIRequest[]
+
+  @@map("api_collections")
+}
+
+model APIRequest {
+  id              String          @id @default(uuid())
+  collectionId    String
+  name            String
+  description     String?
+  method          HttpMethod      @default(GET)
+  url             String
+  protocol        ApiProtocol     @default(REST)
+  headers         Json?
+  queryParams     Json?
+  pathParams      Json?
+  cookies         Json?
+  authType        ApiAuthType     @default(NONE)
+  authConfig      Json?
+  bodyType        ApiBodyType     @default(NONE)
+  body            String?
+  preRequestScript  String?
+  testScript      String?
+  timeoutMs       Int             @default(30000)
+  followRedirects Boolean         @default(true)
+  retryCount      Int             @default(0)
+  retryDelayMs    Int             @default(1000)
+  order           Int             @default(0)
+  isDeleted       Boolean         @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  collection      APICollection   @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  responses       APIResponse[]
+  histories       APIHistory[]
+  testCases       APITestCase[]
+  assertions      APIAssertion[]
+
+  @@map("api_requests")
+}
+
+model APIEnvironment {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  name          String
+  variables     Json     @default("[]")
+  isActive      Boolean  @default(false)
+  isDeleted     Boolean  @default(false)
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace     APIWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("api_environments")
+}
+
+model APIHistory {
+  id              String          @id @default(uuid())
+  requestId       String?
+  userId          String
+  method          HttpMethod
+  url             String
+  requestHeaders  Json?
+  requestBody     String?
+  statusCode      Int?
+  responseHeaders Json?
+  responseBody    String?
+  responseTimeMs  Int?
+  responseSizeBytes Int?
+  error           String?
+  status          ApiRequestStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+
+  request         APIRequest?     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_histories")
+}
+
+model APIResponse {
+  id              String   @id @default(uuid())
+  requestId       String
+  name            String
+  statusCode      Int
+  headers         Json?
+  body            String?
+  responseTimeMs  Int?
+  createdAt       DateTime @default(now())
+
+  request         APIRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("api_responses")
+}
+
+model APITestCase {
+  id            String   @id @default(uuid())
+  requestId     String
+  name          String
+  script        String
+  isActive      Boolean  @default(true)
+  lastResult    Json?
+  lastRunAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  request       APIRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("api_test_cases_api")
+}
+
+model APIMockServer {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  name          String
+  description   String?
+  port          Int?
+  isActive      Boolean  @default(false)
+  routes        Json     @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace     APIWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("api_mock_servers")
+}
+
+model APIAssertion {
+  id            String   @id @default(uuid())
+  requestId     String
+  name          String
+  property      String
+  comparison    String
+  expectedValue String
+  isActive      Boolean  @default(true)
+  lastResult    Boolean?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  request       APIRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("api_assertions")
+}
+
+model APIVariable {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  key           String
+  value         String
+  isSecret      Boolean  @default(false)
+  scope         String   @default("workspace")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workspace     APIWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key, scope])
+  @@map("api_variables")
+}
+
+model APITeamMember {
+  id            String           @id @default(uuid())
+  workspaceId   String
+  userId        String
+  role          ApiWorkspaceRole @default(VIEWER)
+  joinedAt      DateTime         @default(now())
+
+  workspace     APIWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("api_team_members")
+}
+
+model APILog {
+  id            String   @id @default(uuid())
+  userId        String
+  action        String
+  resource      String
+  resourceId    String?
+  details       Json?
+  ipAddress     String?
+  timestamp     DateTime @default(now())
+
+  user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("api_logs")
 }

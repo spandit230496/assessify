@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Role } from '@prisma/client';
@@ -19,9 +12,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('coding')
 export class CodingExecutionController {
-  constructor(
-    private readonly codingExecutionService: CodingExecutionService,
-  ) {}
+  constructor(private readonly codingExecutionService: CodingExecutionService) {}
 
   @Post('execute')
   @Roles(Role.CANDIDATE)
@@ -33,10 +24,7 @@ export class CodingExecutionController {
   @Post('run-tests/:questionId')
   @Roles(Role.CANDIDATE)
   @ApiOperation({ summary: 'Run test cases' })
-  async runTestCases(
-    @Param('questionId') questionId: string,
-    @Body() dto: ExecuteCodeDto,
-  ) {
+  async runTestCases(@Param('questionId') questionId: string, @Body() dto: ExecuteCodeDto) {
     return this.codingExecutionService.runTestCases(dto, questionId);
   }
 

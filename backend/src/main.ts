@@ -17,10 +17,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 4000);
-  const frontendUrl = configService.get<string>(
-    'FRONTEND_URL',
-    'http://localhost:3000',
-  );
+  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
 
   app.use(helmet());
   app.use(cookieParser());
@@ -44,10 +41,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(
-    new LoggingInterceptor(),
-    new TransformInterceptor(),
-  );
+  app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Assessify API')
@@ -62,6 +56,7 @@ async function bootstrap() {
     .addTag('proctoring', 'Proctoring endpoints')
     .addTag('analytics', 'Analytics and reports')
     .addTag('coding', 'Code execution')
+    .addTag('api-testing', 'API Testing workspace')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
