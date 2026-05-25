@@ -1,0 +1,169 @@
+// ──────────────────────────────────────────────────────────────────
+// Evaluation Module — Prisma Schema Extension
+// ──────────────────────────────────────────────────────────────────
+// These models should be APPENDED to the existing schema.prisma file.
+// No existing models are modified.
+// ──────────────────────────────────────────────────────────────────
+
+// ─── NEW ENUMS ──────────────────────────────────────────────────
+
+enum EvaluationStatus {
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  TIMEOUT
+  COMPILATION_ERROR
+  RUNTIME_ERROR
+}
+
+enum SubmissionType {
+  RUN
+  FINAL
+  PRACTICE
+}
+
+enum TestCaseVerdict {
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  RUNTIME_ERROR
+  COMPILATION_ERROR
+  INTERNAL_ERROR
+}
+
+// ─── NEW MODELS ─────────────────────────────────────────────────
+
+model Evaluation {
+  id                String            @id @default(uuid())
+  evaluationId      String            @unique             // human-readable: EVL-XXXXX
+  userId            String
+  problemId         String
+  attemptId         String?                               // nullable for practice mode
+  language          String                                // JAVA, PYTHON, JAVASCRIPT, CPP, GO
+  sourceCode        String                                // submitted source code
+  customInput       String?
+  submissionType    SubmissionType    @default(FINAL)
+  status            EvaluationStatus  @default(QUEUED)
+  score             Decimal           @default(0) @db.Decimal(10, 2)
+  maxScore          Decimal           @default(100) @db.Decimal(10, 2)
+  testCasesPassed   Int               @default(0)
+  testCasesFailed   Int               @default(0)
+  testCasesTotal    Int               @default(0)
+  retryCount        Int               @default(0)
+  maxRetries        Int               @default(3)
+  originalEvalId    String?                               // links to original evaluation for retries
+  idempotencyKey    String?           @unique
+  workerId          String?                               // which worker processed this
+  errorMessage      String?
+  errorCode         String?
+  submittedAt       DateTime          @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id])
+  problem           Question          @relation(fields: [problemId], references: [id])
+  attempt           AssessmentAttempt? @relation(fields: [attemptId], references: [id])
+  originalEval      Evaluation?       @relation("EvaluationRetry", fields: [originalEvalId], references: [id])
+  retries           Evaluation[]      @relation("EvaluationRetry")
+  results           EvaluationResult[]
+  metrics           EvaluationMetrics?
+  logs              SubmissionLog[]
+
+  @@index([userId])
+  @@index([problemId])
+  @@index([status])
+  @@index([submittedAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([attemptId])
+  @@map("evaluations")
+}
+
+model EvaluationResult {
+  id              String          @id @default(uuid())
+  evaluationId    String
+  testCaseId      String
+  order           Int
+  passed          Boolean         @default(false)
+  verdict         TestCaseVerdict @default(INTERNAL_ERROR)
+  actualOutput    String?
+  executionTimeMs Int?
+  memoryUsedKb    Int?
+  stderr          String?
+  exitCode        Int?
+  createdAt       DateTime        @default(now())
+
+  // Relations
+  evaluation      Evaluation      @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  testCase        TestCase        @relation(fields: [testCaseId], references: [id])
+
+  @@unique([evaluationId, testCaseId])
+  @@index([evaluationId])
+  @@index([verdict])
+  @@map("evaluation_results")
+}
+
+model EvaluationMetrics {
+  id                    String   @id @default(uuid())
+  evaluationId          String   @unique
+  totalExecutionTimeMs  Int      @default(0)
+  peakMemoryUsedKb      Int      @default(0)
+  compilationTimeMs     Int      @default(0)
+  avgExecutionTimeMs    Int      @default(0)
+  cpuTimeMs             Int      @default(0)
+  wallTimeMs            Int      @default(0)
+  sandboxOverheadMs     Int      @default(0)
+  createdAt             DateTime @default(now())
+
+  // Relations
+  evaluation            Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@map("execution_metrics")
+}
+
+model SubmissionLog {
+  id              String   @id @default(uuid())
+  evaluationId    String
+  eventType       String                        // SUBMITTED, QUEUED, STARTED, TC_PASSED, TC_FAILED, COMPLETED, FAILED, RETRIED
+  eventData       Json?
+  workerId        String?
+  ipAddress       String?
+  userAgent       String?
+  timestamp       DateTime @default(now())
+
+  // Relations
+  evaluation      Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId])
+  @@index([eventType])
+  @@index([timestamp(sort: Desc)])
+  @@map("submission_logs")
+}
+
+// ─── REQUIRED CHANGES TO EXISTING MODELS ────────────────────────
+//
+// Add these relation fields to existing models (additive only):
+//
+// model User {
+//   ...existing fields...
+//   evaluations  Evaluation[]    // ADD THIS LINE
+// }
+//
+// model Question {
+//   ...existing fields...
+//   evaluations  Evaluation[]    // ADD THIS LINE
+// }
+//
+// model AssessmentAttempt {
+//   ...existing fields...
+//   evaluations  Evaluation[]    // ADD THIS LINE
+// }
+//
+// model TestCase {
+//   ...existing fields...
+//   evaluationResults  EvaluationResult[]  // ADD THIS LINE
+// }

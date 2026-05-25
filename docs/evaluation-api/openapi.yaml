@@ -1,0 +1,793 @@
+openapi: 3.0.3
+info:
+  title: Assessify — Evaluation REST API
+  description: |
+    Evaluation module for asynchronous code submission evaluation.
+    Extends the existing Assessify platform with 5 new endpoints.
+  version: 1.0.0
+  contact:
+    name: Assessify Platform
+  license:
+    name: MIT
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+tags:
+  - name: Evaluations
+    description: Code submission evaluation endpoints
+  - name: User Evaluations
+    description: User-scoped evaluation history
+
+security:
+  - BearerAuth: []
+
+paths:
+  /evaluations:
+    post:
+      tags: [Evaluations]
+      operationId: submitEvaluation
+      summary: Submit code for evaluation
+      description: |
+        Accepts a coding submission, creates an evaluation record (status: QUEUED),
+        and publishes a `submission-received` Kafka event for async processing.
+        Supports idempotency via the `X-Idempotency-Key` header.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEvaluationRequest'
+            example:
+              userId: 101
+              problemId: "5001"
+              language: JAVA
+              sourceCode: |
+                import java.util.*;
+                public class Solution {
+                  public static int[] twoSum(int[] nums, int target) {
+                    Map<Integer,Integer> map = new HashMap<>();
+                    for (int i = 0; i < nums.length; i++) {
+                      int complement = target - nums[i];
+                      if (map.containsKey(complement))
+                        return new int[]{map.get(complement), i};
+                      map.put(nums[i], i);
+                    }
+                    return new int[]{};
+                  }
+                }
+              customInput: ""
+              submissionType: FINAL
+      responses:
+        '201':
+          description: Evaluation created and queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationCreatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /evaluations/{evaluationId}:
+    get:
+      tags: [Evaluations]
+      operationId: getEvaluationStatus
+      summary: Get evaluation status
+      description: |
+        Returns the current status of an evaluation. Clients should poll
+        every 2–5 seconds until the status reaches a terminal state
+        (COMPLETED, FAILED, TIMEOUT, COMPILATION_ERROR, RUNTIME_ERROR).
+        Status is cached in Redis with a 30-second TTL.
+      parameters:
+        - $ref: '#/components/parameters/EvaluationId'
+      responses:
+        '200':
+          description: Evaluation status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationStatusResponse'
+              examples:
+                queued:
+                  summary: Queued
+                  value:
+                    evaluationId: EVL-10001
+                    status: QUEUED
+                    submittedAt: "2026-05-25T10:30:00Z"
+                in_progress:
+                  summary: In Progress
+                  value:
+                    evaluationId: EVL-10001
+                    status: IN_PROGRESS
+                    submittedAt: "2026-05-25T10:30:00Z"
+                    startedAt: "2026-05-25T10:30:01Z"
+                    progress:
+                      testCasesCompleted: 3
+                      testCasesTotal: 10
+                completed:
+                  summary: Completed
+                  value:
+                    evaluationId: EVL-10001
+                    status: COMPLETED
+                    submittedAt: "2026-05-25T10:30:00Z"
+                    startedAt: "2026-05-25T10:30:01Z"
+                    completedAt: "2026-05-25T10:30:04Z"
+                    summary:
+                      score: 85.0
+                      testCasesPassed: 8
+                      testCasesFailed: 2
+                      testCasesTotal: 10
+                      executionTimeMs: 142
+                      memoryUsedKb: 32768
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /evaluations/{evaluationId}/result:
+    get:
+      tags: [Evaluations]
+      operationId: getEvaluationResult
+      summary: Get detailed evaluation result
+      description: |
+        Returns the full evaluation result including per-test-case breakdown,
+        execution metrics, and score. Only available when the evaluation has
+        reached a terminal status. Hidden test case inputs/outputs are redacted
+        for CANDIDATE role.
+      parameters:
+        - $ref: '#/components/parameters/EvaluationId'
+      responses:
+        '200':
+          description: Detailed evaluation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResultResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Result not available (evaluation not in terminal status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: EVAL_011
+                  status: 422
+                  message: "Evaluation result not available. Current status: IN_PROGRESS"
+                  timestamp: "2026-05-25T10:30:02Z"
+                  path: /api/v1/evaluations/EVL-10001/result
+                  traceId: trace-uuid-123
+
+  /evaluations/{evaluationId}/retry:
+    post:
+      tags: [Evaluations]
+      operationId: retryEvaluation
+      summary: Re-evaluate a failed submission
+      description: |
+        Creates a new evaluation linked to the original failed/timed-out evaluation.
+        Only RECRUITER and SUPER_ADMIN roles can trigger retries.
+        Maximum of 3 retries per original evaluation.
+      parameters:
+        - $ref: '#/components/parameters/EvaluationId'
+      responses:
+        '201':
+          description: Retry evaluation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetryEvaluationResponse'
+        '400':
+          description: Cannot retry (not in FAILED/TIMEOUT status or max retries exceeded)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                not_retryable:
+                  summary: Not in retryable status
+                  value:
+                    error:
+                      code: EVAL_004
+                      status: 400
+                      message: "Cannot retry: evaluation status is COMPLETED"
+                      timestamp: "2026-05-25T11:00:00Z"
+                      path: /api/v1/evaluations/EVL-10001/retry
+                      traceId: trace-uuid-456
+                max_retries:
+                  summary: Max retries exceeded
+                  value:
+                    error:
+                      code: EVAL_005
+                      status: 400
+                      message: "Maximum retry count (3) exceeded"
+                      timestamp: "2026-05-25T11:00:00Z"
+                      path: /api/v1/evaluations/EVL-10001/retry
+                      traceId: trace-uuid-789
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/evaluations:
+    get:
+      tags: [User Evaluations]
+      operationId: getUserEvaluations
+      summary: Get submission history for a user
+      description: |
+        Returns paginated evaluation history. CANDIDATE role can only access
+        their own history (userId must match JWT subject). RECRUITER and
+        SUPER_ADMIN can access any user's history.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User ID
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Items per page
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [submittedAt, score, status]
+            default: submittedAt
+          description: Sort field
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/EvaluationStatus'
+          description: Filter by evaluation status
+        - name: problemId
+          in: query
+          schema:
+            type: string
+          description: Filter by problem ID
+        - name: language
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProgrammingLanguage'
+          description: Filter by programming language
+      responses:
+        '200':
+          description: Paginated evaluation history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEvaluationsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token from existing /auth/login endpoint
+
+  parameters:
+    EvaluationId:
+      name: evaluationId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^EVL-\d+$'
+        example: EVL-10001
+      description: Human-readable evaluation identifier
+
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 100
+        example: client-uuid-12345
+      description: Idempotency key to prevent duplicate submissions
+
+  schemas:
+    # ─── Enums ─────────────────────────────────────────
+    EvaluationStatus:
+      type: string
+      enum:
+        - QUEUED
+        - IN_PROGRESS
+        - COMPLETED
+        - FAILED
+        - TIMEOUT
+        - COMPILATION_ERROR
+        - RUNTIME_ERROR
+
+    SubmissionType:
+      type: string
+      enum:
+        - RUN
+        - FINAL
+        - PRACTICE
+
+    ProgrammingLanguage:
+      type: string
+      enum:
+        - JAVA
+        - PYTHON
+        - JAVASCRIPT
+        - CPP
+        - GO
+
+    TestCaseVerdict:
+      type: string
+      enum:
+        - ACCEPTED
+        - WRONG_ANSWER
+        - TIME_LIMIT_EXCEEDED
+        - MEMORY_LIMIT_EXCEEDED
+        - RUNTIME_ERROR
+        - COMPILATION_ERROR
+        - INTERNAL_ERROR
+
+    # ─── Request Schemas ───────────────────────────────
+    CreateEvaluationRequest:
+      type: object
+      required:
+        - userId
+        - problemId
+        - language
+        - sourceCode
+        - submissionType
+      properties:
+        userId:
+          type: integer
+          description: ID of the user submitting code
+          example: 101
+        problemId:
+          type: string
+          description: ID of the coding problem
+          example: "5001"
+        language:
+          $ref: '#/components/schemas/ProgrammingLanguage'
+        sourceCode:
+          type: string
+          maxLength: 100000
+          minLength: 1
+          description: Source code to evaluate
+        customInput:
+          type: string
+          maxLength: 10000
+          default: ""
+          description: Custom input for RUN-type submissions
+        submissionType:
+          $ref: '#/components/schemas/SubmissionType'
+
+    # ─── Response Schemas ──────────────────────────────
+    EvaluationCreatedResponse:
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          example: EVL-10001
+        status:
+          $ref: '#/components/schemas/EvaluationStatus'
+        submittedAt:
+          type: string
+          format: date-time
+          example: "2026-05-25T10:30:00Z"
+        estimatedCompletionMs:
+          type: integer
+          example: 5000
+          description: Estimated time until evaluation completes (milliseconds)
+        _links:
+          type: object
+          properties:
+            self:
+              type: string
+              example: /api/v1/evaluations/EVL-10001
+            result:
+              type: string
+              example: /api/v1/evaluations/EVL-10001/result
+            poll:
+              type: string
+              example: /api/v1/evaluations/EVL-10001
+
+    EvaluationStatusResponse:
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          example: EVL-10001
+        status:
+          $ref: '#/components/schemas/EvaluationStatus'
+        submittedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        progress:
+          type: object
+          nullable: true
+          properties:
+            testCasesCompleted:
+              type: integer
+            testCasesTotal:
+              type: integer
+        summary:
+          type: object
+          nullable: true
+          description: Present only when status is COMPLETED
+          properties:
+            score:
+              type: number
+              format: double
+            testCasesPassed:
+              type: integer
+            testCasesFailed:
+              type: integer
+            testCasesTotal:
+              type: integer
+            executionTimeMs:
+              type: integer
+            memoryUsedKb:
+              type: integer
+
+    EvaluationResultResponse:
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          example: EVL-10001
+        status:
+          $ref: '#/components/schemas/EvaluationStatus'
+        language:
+          $ref: '#/components/schemas/ProgrammingLanguage'
+        submissionType:
+          $ref: '#/components/schemas/SubmissionType'
+        score:
+          type: number
+          format: double
+          example: 85.0
+        maxScore:
+          type: number
+          format: double
+          example: 100.0
+        testCaseResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestCaseResult'
+        executionMetrics:
+          $ref: '#/components/schemas/ExecutionMetrics'
+        submittedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    TestCaseResult:
+      type: object
+      properties:
+        testCaseId:
+          type: string
+          example: TC-001
+        order:
+          type: integer
+        passed:
+          type: boolean
+        isHidden:
+          type: boolean
+          description: If true, input/expectedOutput/actualOutput are redacted for CANDIDATE role
+        input:
+          type: string
+          description: "[HIDDEN] for hidden test cases when viewed by CANDIDATE"
+        expectedOutput:
+          type: string
+          description: "[HIDDEN] for hidden test cases when viewed by CANDIDATE"
+        actualOutput:
+          type: string
+          description: "[HIDDEN] for hidden test cases when viewed by CANDIDATE"
+        executionTimeMs:
+          type: integer
+        memoryUsedKb:
+          type: integer
+        status:
+          $ref: '#/components/schemas/TestCaseVerdict'
+
+    ExecutionMetrics:
+      type: object
+      properties:
+        totalExecutionTimeMs:
+          type: integer
+          example: 142
+        peakMemoryUsedKb:
+          type: integer
+          example: 65536
+        compilationTimeMs:
+          type: integer
+          example: 320
+        averageExecutionTimeMs:
+          type: integer
+          example: 14
+
+    RetryEvaluationResponse:
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          example: EVL-10002
+        originalEvaluationId:
+          type: string
+          example: EVL-10001
+        status:
+          $ref: '#/components/schemas/EvaluationStatus'
+        retriedAt:
+          type: string
+          format: date-time
+        retryCount:
+          type: integer
+          example: 1
+
+    UserEvaluationsResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvaluationSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    EvaluationSummary:
+      type: object
+      properties:
+        evaluationId:
+          type: string
+          example: EVL-10001
+        problemId:
+          type: string
+          example: "5001"
+        problemTitle:
+          type: string
+          example: Two Sum
+        language:
+          $ref: '#/components/schemas/ProgrammingLanguage'
+        status:
+          $ref: '#/components/schemas/EvaluationStatus'
+        score:
+          type: number
+          format: double
+        testCasesPassed:
+          type: integer
+        testCasesTotal:
+          type: integer
+        submissionType:
+          $ref: '#/components/schemas/SubmissionType'
+        submittedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+        hasNext:
+          type: boolean
+          example: true
+        hasPrev:
+          type: boolean
+          example: false
+
+    # ─── Error Schema ──────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: EVAL_001
+            status:
+              type: integer
+              example: 400
+            message:
+              type: string
+              example: Unsupported programming language
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  reason:
+                    type: string
+              nullable: true
+            timestamp:
+              type: string
+              format: date-time
+            path:
+              type: string
+            traceId:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Validation error or bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_001
+              status: 400
+              message: "Validation failed"
+              details:
+                - field: sourceCode
+                  reason: "must not be empty"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations
+              traceId: trace-uuid
+
+    Unauthorized:
+      description: Missing or invalid JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_006
+              status: 401
+              message: "Invalid or expired JWT token"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations
+              traceId: trace-uuid
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_007
+              status: 403
+              message: "Insufficient permissions for this resource"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations/EVL-10001/retry
+              traceId: trace-uuid
+
+    NotFound:
+      description: Evaluation not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_008
+              status: 404
+              message: "Evaluation not found: EVL-99999"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations/EVL-99999
+              traceId: trace-uuid
+
+    Conflict:
+      description: Duplicate submission (idempotency key conflict)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_010
+              status: 409
+              message: "Duplicate submission detected for idempotency key: client-uuid-12345"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations
+              traceId: trace-uuid
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit resets
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests in window
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_012
+              status: 429
+              message: "Rate limit exceeded. Try again in 45 seconds."
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations
+              traceId: trace-uuid
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: EVAL_013
+              status: 500
+              message: "Internal evaluation error"
+              timestamp: "2026-05-25T10:30:00Z"
+              path: /api/v1/evaluations
+              traceId: trace-uuid
