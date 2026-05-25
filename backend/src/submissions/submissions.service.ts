@@ -4,7 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { AttemptStatus, AnswerStatus } from '@prisma/client';
+import { AttemptStatus, AnswerStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { SubmitAnswerDto } from './dto/submit-answer.dto';
 
@@ -102,14 +102,14 @@ export class SubmissionsService {
         status: dto.status || AnswerStatus.ANSWERED,
         selectedOptionIds: dto.selectedOptionIds || [],
         textAnswer: dto.textAnswer,
-        codeAnswer: dto.codeAnswer,
+        codeAnswer: dto.codeAnswer as Prisma.InputJsonValue,
         timeTakenSeconds: dto.timeTakenSeconds || 0,
       },
       update: {
         status: dto.status || AnswerStatus.ANSWERED,
         selectedOptionIds: dto.selectedOptionIds || [],
         textAnswer: dto.textAnswer,
-        codeAnswer: dto.codeAnswer,
+        codeAnswer: dto.codeAnswer as Prisma.InputJsonValue,
         timeTakenSeconds: dto.timeTakenSeconds || 0,
       },
     });

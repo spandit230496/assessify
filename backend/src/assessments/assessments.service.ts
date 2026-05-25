@@ -106,7 +106,22 @@ export class AssessmentsService {
 
     return this.prisma.assessment.update({
       where: { id },
-      data: dto,
+      data: {
+        title: dto.title,
+        description: dto.description,
+        instructions: dto.instructions,
+        totalDuration: dto.totalDuration,
+        totalMarks: dto.totalMarks,
+        passingPercentage: dto.passingPercentage,
+        negativeMarking: dto.negativeMarking,
+        negativeMarkValue: dto.negativeMarkValue,
+        randomizeQuestions: dto.randomizeQuestions,
+        randomizeOptions: dto.randomizeOptions,
+        autoSubmit: dto.autoSubmit,
+        webcamRequired: dto.webcamRequired,
+        fullscreenRequired: dto.fullscreenRequired,
+        tags: dto.tags,
+      },
       include: { sections: true },
     });
   }

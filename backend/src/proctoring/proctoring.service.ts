@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ViolationType } from '@prisma/client';
+import { Prisma, ViolationType } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 
 @Injectable()
@@ -39,7 +39,7 @@ export class ProctoringService {
         attemptId,
         userId,
         eventType,
-        eventData: eventData || undefined,
+        eventData: (eventData || undefined) as Prisma.InputJsonValue,
         screenshotUrl,
         webcamUrl,
       },
@@ -95,7 +95,7 @@ export class ProctoringService {
       },
     });
 
-    const summary = violations.reduce(
+    const summary = violations.reduce<Record<string, any>>(
       (acc, v) => {
         const key = v.userId;
         if (!acc[key]) {
@@ -105,7 +105,7 @@ export class ProctoringService {
         acc[key].count++;
         return acc;
       },
-      {} as Record<string, unknown>,
+      {},
     );
 
     return Object.values(summary);
